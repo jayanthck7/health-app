@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart BMI & Diet Planner</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 40px;
+      background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 650px;
+      margin: auto;
+      box-shadow: 0px 5px 25px rgba(0,0,0,0.2);
+    }
+    h2, h3 {
+      text-align: center;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0 15px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px 5px 15px 0;
+    }
+    button:hover { background: #0056b3; }
+    .hidden { display: none; }
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .underweight { background: #fff3cd; color: #856404; }
+    .healthy { background: #d4edda; color: #155724; }
+    .overweight { background: #f8d7da; color: #721c24; }
+    .progress-container {
+      margin-top: 25px;
+      width: 100%;
+      height: 25px;
+      background: #eee;
+      border-radius: 15px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: green;
+      transition: width 1s ease;
+    }
+    .scale-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-top: 5px;
+    }
+    .diet-plan {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      background: #f4f9ff;
+    }
+    .profile-box {
+      background: #fffbe6;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Step 1: Login -->
+    <div id="loginSection">
+      <h2>ðŸ‘¤ Login / Register</h2>
+      <input type="text" id="username" placeholder="Enter Username"><br>
+      <input type="text" id="contact" placeholder="Enter Contact"><br>
+      <button onclick="saveUser()">Continue</button>
+    </div>
+
+    <!-- Step 2: BMI -->
+    <div id="bmiSection" class="hidden">
+      <h2>ðŸ’ª Smart BMI & Diet Planner</h2>
+      <p>Welcome, <b id="welcomeUser"></b> (<span id="welcomeContact"></span>)</p>
+
+      <label>Enter Height (in cm):</label>
+      <input type="number" id="height">
+
+      <label>Enter Weight (in kg):</label>
+      <input type="number" id="weight">
+
+      <button onclick="checkBMI()">Check BMI</button>
+      <button id="downloadBtn" onclick="downloadPDF()" style="display:none;">Download PDF Plan</button>
+      <button onclick="showProfile()">Go to Profile</button>
+
+      <div class="result" id="result"></div>
+
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="scale-labels">
+        <span>15</span><span>18.5</span><span>24.9</span><span>30</span>
+      </div>
+
+      <div class="diet-plan" id="dietPlan"></div>
+    </div>
+
+    <!-- Step 3: Profile -->
+    <div id="profileSection" class="hidden">
+      <h2>ðŸ“‹ User Profile</h2>
+      <div class="profile-box">
+        <p><b>Username:</b> <span id="profileUser"></span></p>
+        <p><b>Contact:</b> <span id="profileContact"></span></p>
+        <p><b>Last Visited:</b> <span id="lastVisited"></span></p>
+        <p><b>Last BMI:</b> <span id="lastBMI"></span></p>
+        <p><b>Current BMI:</b> <span id="currentBMI"></span></p>
+        <p><b>Last Diet Plan:</b></p>
+        <pre id="lastPlan"></pre>
+        <p><b>Current Diet Plan:</b></p>
+        <pre id="currentPlan"></pre>
+      </div>
+      <button onclick="backToBMI()">Back to BMI</button>
+    </div>
+  </div>
+
+  <script>
+    let lastReport = "";
+    let currentBMI = "";
+
+    // Check if already logged in
+    window.onload = function() {
+      let user = localStorage.getItem("username");
+      if (user) {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("bmiSection").classList.remove("hidden");
+        document.getElementById("welcomeUser").innerText = user;
+        document.getElementById("welcomeContact").innerText = localStorage.getItem("contact");
+      }
+    }
+
+    function saveUser() {
+      let username = document.getElementById("username").value;
+      let contact = document.getElementById("contact").value;
+
+      if (username.trim() === "" || contact.trim() === "") {
+        alert("Please enter both fields!");
+        return;
+      }
+
+      localStorage.setItem("username", username);
+      localStorage.setItem("contact", contact);
+
+      document.getElementById("loginSection").classList.add("hidden");
+      document.getElementById("bmiSection").classList.remove("hidden");
+      document.getElementById("welcomeUser").innerText = username;
+      document.getElementById("welcomeContact").innerText = contact;
+    }
+
+    function checkBMI() {
+      let height = document.getElementById("height").value;
+      let weight = document.getElementById("weight").value;
+      let resultDiv = document.getElementById("result");
+      let progressBar = document.getElementById("progressBar");
+      let dietPlanDiv = document.getElementById("dietPlan");
+      let downloadBtn = document.getElementById("downloadBtn");
+
+      if (height <= 0 || weight <= 0) {
+        resultDiv.innerHTML = "âš ï¸ Please enter valid height and weight.";
+        resultDiv.className = "result";
+        progressBar.style.width = "0%";
+        progressBar.style.background = "gray";
+        dietPlanDiv.innerHTML = "";
+        downloadBtn.style.display = "none";
+        return;
+      }
+
+      let heightInM = height / 100;
+      let bmi = (weight / (heightInM * heightInM)).toFixed(1);
+      currentBMI = bmi;
+      let message = `<b>Your BMI is ${bmi}</b><br>`;
+      let dietPlan = "";
+
+      if (bmi < 18.5) {
+        message += "You are <b>Underweight</b>. You should gain weight.";
+        resultDiv.className = "result underweight";
+        progressBar.style.background = "orange";
+        dietPlan = `Gain Weight Plan:\nVeg: Milk, nuts, paneer, banana, potato\nNon-Veg: Eggs, chicken, fish, dairy`;
+      } 
+      else if (bmi >= 18.5 && bmi < 24.9) {
+        message += "You are in the <b>Healthy weight range</b>. Maintain your diet.";
+        resultDiv.className = "result healthy";
+        progressBar.style.background = "green";
+        dietPlan = `Maintain Plan:\nVeg: Fruits, vegetables, dal, sprouts\nNon-Veg: Lean meat, fish, eggs in moderation`;
+      } 
+      else {
+        message += "You are <b>Overweight</b>. You should lose weight.";
+        resultDiv.className = "result overweight";
+        progressBar.style.background = "red";
+        dietPlan = `Lose Weight Plan:\nVeg: Oats, sprouts, leafy greens, dal\nNon-Veg: Grilled fish, boiled egg whites, skinless chicken`;
+      }
+
+      resultDiv.innerHTML = message;
+      dietPlanDiv.innerHTML = `<pre>${dietPlan}</pre>`;
+      downloadBtn.style.display = "inline-block";
+
+      lastReport = message.replace(/<br>/g, "\n") + "\n\n" + dietPlan;
+
+      // Save history
+      localStorage.setItem("lastVisited", new Date().toLocaleString());
+      localStorage.setItem("lastBMI", bmi);
+      localStorage.setItem("dietPlan", dietPlan);
+
+      // Progress bar scaling
+      let scaledBMI = Math.min(Math.max(bmi, 15), 30);
+      let percentage = ((scaledBMI - 15) / (30 - 15)) * 100;
+      progressBar.style.width = percentage + "%";
+    }
+
+    function showProfile() {
+      document.getElementById("bmiSection").classList.add("hidden");
+      document.getElementById("profileSection").classList.remove("hidden");
+
+      document.getElementById("profileUser").innerText = localStorage.getItem("username");
+      document.getElementById("profileContact").innerText = localStorage.getItem("contact");
+      document.getElementById("lastVisited").innerText = localStorage.getItem("lastVisited") || "First Visit";
+      document.getElementById("lastBMI").innerText = localStorage.getItem("lastBMI") || "-";
+      document.getElementById("currentBMI").innerText = currentBMI || "-";
+      document.getElementById("lastPlan").innerText = localStorage.getItem("dietPlan") || "No plan saved yet!";
+      document.getElementById("currentPlan").innerText = lastReport || "No plan generated yet!";
+    }
+
+    function backToBMI() {
+      document.getElementById("profileSection").classList.add("hidden");
+      document.getElementById("bmiSection").classList.remove("hidden");
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text("BMI Report & Diet Plan", 20, 20);
+      doc.setFontSize(12);
+      let lines = lastReport.split("\n");
+      let y = 40;
+      lines.forEach(line => {
+        doc.text(line, 20, y);
+        y += 10;
+      });
+      doc.save("BMI_Diet_Plan.pdf");
+    }
+  </script>
+</body>
+</html>
